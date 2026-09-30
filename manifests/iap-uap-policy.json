@@ -1,0 +1,22 @@
+{
+  "displayName": "Allow Read-Only MCP Tools and Finance A2A Delegation",
+  "details": {
+    "rules": [
+      {
+        "description": "Allow read-only MCP tools and approved Finance A2A agent for Enterprise Agents",
+        "principals": [
+          "principal://agents.global.org-987654321098.system.id.goog/resources/aiplatform/projects/123456789012/locations/us-central1/reasoningEngines/1234567890",
+          "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/enterprise-pool/*"
+        ],
+        "effect": "ALLOW",
+        "permissions": [
+          "iap.googleapis.com/resources.egressViaIAP"
+        ],
+        "condition": {
+          "title": "RestrictToReadOnlyMcpToolsAndApprovedA2A",
+          "expression": "destination.agent_registry.mcp_server.tool.annotations.read_only_hint == true || destination.agent_registry.agent.name == 'projects/wortz-project-352116/locations/us-central1/agents/internal-finance-a2a'"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+name: projects/wortz-project-352116/policies/discoveryengine.managed.disableCustomMcpServerConnector
+spec:
+  rules:
+    - enforce: false

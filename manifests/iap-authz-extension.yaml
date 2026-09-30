@@ -1,0 +1,13 @@
+# AuthzExtension (networkservices.googleapis.com)
+name: projects/wortz-project-352116/locations/us-central1/authzExtensions/ge-iap-authz-ext
+description: "IAP v2 AuthzExtension for Agent Gateway"
+loadBalancingScheme: INTERNAL_MANAGED
+authority: iap.googleapis.com
+service: iap.googleapis.com
+timeout: 0.1s
+failOpen: false
+forwardHeaders:
+  - Authorization
+  - X-Agent-Identity
+metadata:
+  iapPolicyVersion: V2

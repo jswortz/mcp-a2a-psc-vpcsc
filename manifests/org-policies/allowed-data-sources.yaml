@@ -1,0 +1,9 @@
+name: projects/wortz-project-352116/policies/discoveryengine.managed.allowedDataSources
+spec:
+  rules:
+    - values:
+        allowedValues:
+          - custom_mcp
+          - bigquery
+          - gcs
+          - vertex_ai_search
