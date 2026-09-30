@@ -87,18 +87,24 @@ def test_mcp_toolspec_and_a2a_agent_card() -> None:
 
 def test_shell_scripts_syntax_and_dry_run() -> None:
     """Verify shell scripts pass bash -n syntax validation and DRY_RUN execution."""
-    for script_name in ("deploy_gcp_infrastructure.sh", "publish_private_github_repo.sh"):
+    for script_name in (
+        "deploy_gcp_infrastructure.sh",
+        "publish_private_github_repo.sh",
+        "run_live_gcp_e2e_proof.sh",
+    ):
         script_path = REPO_ROOT / "scripts" / script_name
         check = subprocess.run(["bash", "-n", str(script_path)], capture_output=True, text=True, check=False)
         assert check.returncode == 0, f"Syntax error in {script_name}: {check.stderr}"
 
-    deploy_res = subprocess.run(
-        ["bash", str(REPO_ROOT / "scripts" / "deploy_gcp_infrastructure.sh")],
-        env={"DRY_RUN": "true", "PATH": "/usr/bin:/bin"},
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert deploy_res.returncode == 0
-    assert "=== Provisioning Sequence Completed Successfully ===" in deploy_res.stdout
+    for run_script in ("deploy_gcp_infrastructure.sh", "run_live_gcp_e2e_proof.sh"):
+        deploy_res = subprocess.run(
+            ["bash", str(REPO_ROOT / "scripts" / run_script)],
+            env={"DRY_RUN": "true", "PATH": "/usr/bin:/bin"},
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert deploy_res.returncode == 0, f"DRY_RUN failed for {run_script}: {deploy_res.stderr}"
+        assert "=== Provisioning Sequence Completed Successfully ===" in deploy_res.stdout
+
