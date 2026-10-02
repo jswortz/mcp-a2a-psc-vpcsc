@@ -1,0 +1,11 @@
+# AgentConnectivityTemplate (networkservices.googleapis.com)
+# Bridges Google-managed AI tenant egress into the Enterprise Consumer VPC via PSC
+name: projects/your-gcp-project-id/locations/us-central1/agentConnectivityTemplates/ge-psc-egress-template
+description: "Private PSC Interface egress with Cloud DNS peering for BYO-MCP and A2A"
+accessPath: AGENT_TO_ANYWHERE
+vpcEgress: ALL_TRAFFIC
+networkAttachment: projects/your-gcp-project-id/regions/us-central1/networkAttachments/ge-agent-psc-attachment
+dnsPeeringConfigs:
+  - domain: internal.corp.example.com.
+    targetProject: your-gcp-project-id
+    targetNetwork: enterprise-vpc

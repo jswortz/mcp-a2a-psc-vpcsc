@@ -1,0 +1,10 @@
+name: projects/your-gcp-project-id/policies/discoveryengine.managed.allowedEgressFqdns
+spec:
+  rules:
+    - values:
+        allowedValues:
+          - "*.internal.corp.example.com"
+          - "mcp-data.internal.corp.example.com"
+          - "mcp-onprem.internal.corp.example.com"
+          - "a2a-finance.internal.corp.example.com"
+          - "mcp-partner.external.example.com"

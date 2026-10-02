@@ -1,0 +1,4 @@
+name: projects/your-gcp-project-id/policies/discoveryengine.managed.disableCustomMcpServerConnector
+spec:
+  rules:
+    - enforce: false

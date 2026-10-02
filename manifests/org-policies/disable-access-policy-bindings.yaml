@@ -1,0 +1,4 @@
+name: projects/your-gcp-project-id/policies/iam.managed.disableAccessPolicyBindings
+spec:
+  rules:
+    - enforce: false

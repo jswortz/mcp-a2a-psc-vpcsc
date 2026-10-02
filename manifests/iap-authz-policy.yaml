@@ -1,0 +1,13 @@
+# AuthzPolicy (networksecurity.googleapis.com)
+name: projects/your-gcp-project-id/locations/us-central1/authzPolicies/ge-gateway-iap-policy
+description: "Binds IAP AuthzExtension to Agent Gateway"
+target:
+  loadBalancingScheme: INTERNAL_MANAGED
+  resources:
+    - "projects/your-gcp-project-id/locations/us-central1/agentGateways/ge-private-egress-gateway"
+action: CUSTOM
+customProvider:
+  authzExtension:
+    resources:
+      - "projects/your-gcp-project-id/locations/us-central1/authzExtensions/ge-iap-authz-ext"
+policyProfile: REQUEST_AUTHZ

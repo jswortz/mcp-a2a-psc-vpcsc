@@ -1,0 +1,83 @@
+digraph G {
+    graph [
+        rankdir=LR,
+        dpi=300,
+        fontname="Helvetica,Arial,sans-serif",
+        fontsize=18,
+        labelloc="t",
+        label="End-to-End Architecture: Private Custom MCP (BYO-MCP) & A2A with Agent Gateway, PSC, and VPC-SC\n",
+        pad="0.45",
+        nodesep="0.55",
+        ranksep="1.05",
+        bgcolor="#FFFFFF",
+        splines= spline
+    ];
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Helvetica,Arial,sans-serif",
+        fontsize=11,
+        margin="0.24,0.16",
+        penwidth=1.8
+    ];
+    edge [
+        fontname="Helvetica,Arial,sans-serif",
+        fontsize=10,
+        penwidth=1.8,
+        arrowsize=0.85
+    ];
+
+    subgraph cluster_zone1 {
+        label="Zone 1: Google AI Tenant & Control Plane (your-gcp-project-id)";
+        style="rounded,filled";
+        color="#1A73E8";
+        fillcolor="#E8F0FE";
+        fontsize=13;
+        fontcolor="#174EA6";
+
+        GE [label="Gemini Enterprise App\n(ge-mcp-psc-vpcsc-app)\n[discoveryengine.googleapis.com]", fillcolor="#FFFFFF", color="#1A73E8"];
+        AR [label="Agent Registry (Control Plane Catalog)\n• mcpServers view (toolspec.json)\n• agents view (agent-card.json)\n[agentregistry.googleapis.com / us-central1]", fillcolor="#FFFFFF", color="#1A73E8"];
+        AG [label="Agent Gateway (ge-private-egress-gateway)\n• IAP v2 AuthzExtension + AuthzPolicy\n• IAM v3 UAP CEL (read_only_hint == true)\n• Vertex AI Model Armor (INSPECT_AND_BLOCK)\n• vpcEgress: ALL_TRAFFIC", fillcolor="#D2E3FC", color="#174EA6", penwidth=2.4];
+        RE [label="Vertex AI Agent Engine (GEAP)\n[aiplatform.googleapis.com]", fillcolor="#FFFFFF", color="#1A73E8"];
+    }
+
+    subgraph cluster_zone2 {
+        label="Zone 2: Private PSC & Split-Horizon DNS Bridge";
+        style="rounded,filled";
+        color="#007B83";
+        fillcolor="#E4F7FB";
+        fontsize=13;
+        fontcolor="#005A60";
+
+        DNS [label="Split-Horizon Cloud DNS Peering\n• *.internal.corp.example.com.\n• *.run.app.\n(roles/dns.peer on Network Mgmt SA)", fillcolor="#FFFFFF", color="#007B83"];
+        PSC_OUT [label="PSC Network Attachment\n(ge-agent-psc-attachment)\nSubnet: 10.128.20.0/28 -> IP: 10.128.20.2\n(ACCEPT_AUTOMATIC)", fillcolor="#CBF0F8", color="#007B83", penwidth=2.2];
+        PSC_IN [label="Consumer PSC Endpoint\n• 10.128.10.99 (Inbound A2A)\n• 172.16.20.20 (psc2gapis)", fillcolor="#FFFFFF", color="#007B83"];
+    }
+
+    subgraph cluster_zone3 {
+        label="Zone 3: Customer VPC (enterprise-vpc) & Workloads [VPC-SC Perimeter]";
+        style="rounded,filled";
+        color="#188038";
+        fillcolor="#E6F4EA";
+        fontsize=13;
+        fontcolor="#0D652D";
+
+        ALB [label="Internal Cross-Region ALB / PSC Target\nVIP: 10.128.10.50:443 / 172.16.20.20:443\n(Firewall: allow tcp:443 from 10.128.20.0/28)", fillcolor="#CEEAD6", color="#188038", penwidth=2.2];
+        INVPC [label="In-VPC Serverless NEG (Cloud Run / GKE)\ninternal-data-mcp (/mcp)\n[INGRESS_TRAFFIC_INTERNAL_ONLY]", fillcolor="#FFFFFF", color="#188038"];
+        HYBRID [label="Outside-VPC Hybrid Connectivity NEG\nonprem-erp-mcp (/mcp)\n[Cloud Interconnect / HA VPN]", fillcolor="#FFFFFF", color="#188038"];
+        A2A [label="Private A2A Agent (Standalone NEG)\ninternal-finance-a2a (/a2a)\n[A2A Protocol v0.3.0]", fillcolor="#FFFFFF", color="#188038"];
+        CALLER [label="Internal VPC / On-Premises Caller\n(Inbound A2A Client)", fillcolor="#FEF7E0", color="#E37400"];
+    }
+
+    GE -> AR [label="1. Discover MCP & A2A", color="#1A73E8", style=dashed];
+    AR -> AG [label="2. Registry Binding &\nTool Annotations", color="#1A73E8", style=dashed];
+    GE -> AG [label="3. Governed Egress\n(:streamAssist)", color="#174EA6", penwidth=2.4];
+    AG -> DNS [label="4. DNS Peering Lookup", color="#007B83", style=dotted];
+    AG -> PSC_OUT [label="5. Private Egress\n(SPIFFE + OAuth JWT)", color="#007B83", penwidth=2.4];
+    PSC_OUT -> ALB [label="6. In-VPC Packet\n(10.128.20.2 -> 443)", color="#188038", penwidth=2.4];
+    ALB -> INVPC [label="Host: mcp-data / *.run.app", color="#188038"];
+    ALB -> HYBRID [label="Host: mcp-onprem", color="#188038"];
+    ALB -> A2A [label="Host: a2a-finance", color="#188038"];
+    CALLER -> PSC_IN [label="Inbound A2A\n(10.128.10.99)", color="#E37400"];
+    PSC_IN -> RE [label="PSC Service Attachment", color="#E37400"];
+}

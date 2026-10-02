@@ -1,0 +1,30 @@
+# AgentGateway (networkservices.googleapis.com)
+# Governs outbound MCP and A2A traffic from Gemini Enterprise and Vertex AI Agent Runtime
+name: projects/your-gcp-project-id/locations/us-central1/agentGateways/ge-private-egress-gateway
+description: "Centralized Agent Gateway for Private BYO-MCP and A2A Workloads"
+protocols:
+  - MCP
+networkConfig:
+  egress:
+    agentConnectivityTemplate: projects/your-gcp-project-id/locations/us-central1/agentConnectivityTemplates/ge-psc-egress-template
+    networkAttachment: projects/your-gcp-project-id/regions/us-central1/networkAttachments/ge-agent-psc-attachment
+    dnsPeeringConfig:
+      - domain: run.app.
+        targetProject: your-gcp-project-id
+        targetNetwork: enterprise-vpc
+      - domain: internal.corp.example.com.
+        targetProject: your-gcp-project-id
+        targetNetwork: enterprise-vpc
+googleManaged:
+  governedAccessPath: AGENT_TO_ANYWHERE
+  resourceUri: "//discoveryengine.googleapis.com/projects/123456789012/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app"
+registries:
+  - "//agentregistry.googleapis.com/projects/your-gcp-project-id/locations/us-central1"
+registryBindings:
+  - projects/your-gcp-project-id/locations/us-central1
+governedResources:
+  - "//discoveryengine.googleapis.com/projects/your-gcp-project-id/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app"
+  - "//aiplatform.googleapis.com/projects/your-gcp-project-id/locations/us-central1/reasoningEngines/1234567890"
+selfManaged:
+  resourceUri: projects/your-gcp-project-id/regions/us-central1/subnetworks/ge-agent-psc-subnet
+

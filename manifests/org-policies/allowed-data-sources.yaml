@@ -1,0 +1,9 @@
+name: projects/your-gcp-project-id/policies/discoveryengine.managed.allowedDataSources
+spec:
+  rules:
+    - values:
+        allowedValues:
+          - custom_mcp
+          - bigquery
+          - gcs
+          - vertex_ai_search

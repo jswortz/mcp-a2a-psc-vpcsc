@@ -1,0 +1,56 @@
+{
+  "tools": [
+    {
+      "name": "query_financial_metrics",
+      "description": "Query internal financial metrics by ticker and fiscal quarter",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "description": "Company ticker symbol (e.g., GOOG)"
+          },
+          "quarter": {
+            "type": "string",
+            "description": "Fiscal quarter (e.g., Q3-2026)"
+          }
+        },
+        "required": ["ticker", "quarter"]
+      },
+      "isReadOnly": true,
+      "isDestructive": false,
+      "isIdempotent": true,
+      "isOpenWorld": false,
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "delete_ledger_record",
+      "description": "Delete an internal ledger entry (mutating operation blocked by IAP CEL policy)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "description": "Ledger record identifier"
+          }
+        },
+        "required": ["record_id"]
+      },
+      "isReadOnly": false,
+      "isDestructive": true,
+      "isIdempotent": false,
+      "isOpenWorld": false,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    }
+  ]
+}
