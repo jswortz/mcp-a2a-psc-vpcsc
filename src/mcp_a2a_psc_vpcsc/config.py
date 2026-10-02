@@ -38,9 +38,9 @@ def resolve_jwt_secret() -> str:
 class ArchitectureConfig:
     """Centralized configuration for the PSC + VPC-SC Reference Architecture."""
 
-    project_id: str = field(default_factory=lambda: os.getenv("GCP_PROJECT_ID", "wortz-project-352116"))
-    project_number: str = field(default_factory=lambda: os.getenv("GCP_PROJECT_NUMBER", "679926387543"))
-    org_id: str = field(default_factory=lambda: os.getenv("GCP_ORG_ID", "1060412978793"))
+    project_id: str = field(default_factory=lambda: os.getenv("GCP_PROJECT_ID", "your-gcp-project-id"))
+    project_number: str = field(default_factory=lambda: os.getenv("GCP_PROJECT_NUMBER", "123456789012"))
+    org_id: str = field(default_factory=lambda: os.getenv("GCP_ORG_ID", "987654321098"))
     region: str = field(default_factory=lambda: os.getenv("GCP_REGION", "us-central1"))
     ge_app_location: str = field(default_factory=lambda: os.getenv("GE_APP_LOCATION", "global"))
     vpc_network_name: str = field(default_factory=lambda: os.getenv("VPC_NETWORK_NAME", "enterprise-vpc"))

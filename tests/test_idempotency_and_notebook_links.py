@@ -286,9 +286,8 @@ def test_executive_slides_and_presentation_links() -> None:
     readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     nb_text = (REPO_ROOT / "notebooks" / "agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb").read_text(encoding="utf-8")
 
-    gslides_url = "https://docs.google.com/presentation/d/1zETenOHeK_W2swO5CU2c0gRVI2zy6A6UnCx7kTBfqqs/edit"
-    assert gslides_url in readme_text
-    assert gslides_url in nb_text
+    assert "notebooks/assets/slides/slides-patch.md" in readme_text
+    assert "assets/slides/slides-patch.md" in nb_text
 
     for slide_name in expected_slides:
         slide_path = slides_dir / slide_name

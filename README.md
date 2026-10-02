@@ -2,8 +2,8 @@
 
 This repository implements and proves the end-to-end architecture for connecting **Gemini Enterprise App (`discoveryengine.googleapis.com`)** and **Vertex AI Agent Runtime (`aiplatform.googleapis.com`)** to private **Custom MCP (BYO-MCP)** servers and **Agent2Agent (A2A)** workloads over **Private Service Connect (PSC)** inside a **VPC Service Controls (VPC-SC)** perimeter.
 
-* **Companion Google Doc Guide (with 6-Slide Executive Walkthrough):** [Private Connectivity Guide: Custom MCP (BYO-MCP) & A2A Agents with PSC and VPC-SC](https://docs.google.com/document/d/16bjMEo-vj8HLremQuTdE3l6hASpZ8qp-OO019x9SmrQ/edit)
-* **Executive 6-Slide Google Slides Presentation (16:9 HD):** [Executive Walkthrough: Connecting Custom MCP (BYO-MCP) & A2A with PSC and VPC-SC](https://docs.google.com/presentation/d/1zETenOHeK_W2swO5CU2c0gRVI2zy6A6UnCx7kTBfqqs/edit)
+* **Companion Google Doc Guide (with 6-Slide Executive Walkthrough):** [Private Connectivity Guide: Custom MCP (BYO-MCP) & A2A Agents with PSC and VPC-SC](notebooks/assets/slides/slides-patch.md)
+* **Executive 6-Slide Google Slides Presentation (16:9 HD):** [Executive Walkthrough: Connecting Custom MCP (BYO-MCP) & A2A with PSC and VPC-SC](notebooks/assets/slides/slides-patch.md)
 * **8-Lesson Interactive Tutorial Notebook:** [`notebooks/agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb`](notebooks/agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb)
 
 ---
@@ -101,21 +101,21 @@ RUN_LIVE_GCP_E2E=true PYTHONPATH=src pytest -v
 
 ---
 
-## Live GCP Deployment Proof (`wortz-project-352116` / `679926387543`)
+## Live GCP Deployment Proof (`your-gcp-project-id` / `123456789012`)
 
-All components from the [Companion Google Doc Guide](https://docs.google.com/document/d/16bjMEo-vj8HLremQuTdE3l6hASpZ8qp-OO019x9SmrQ/edit) are deployed and verified end-to-end in `wortz-project-352116`:
+All components from the [Companion Google Doc Guide](notebooks/assets/slides/slides-patch.md) are deployed and verified end-to-end in `your-gcp-project-id`:
 
 | Layer | Resource Type | Live Resource Identifier / Configuration |
 | :--- | :--- | :--- |
-| **Gemini Enterprise App** | `discoveryengine.googleapis.com/Engine` | `projects/679926387543/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app` (`defaultEgressAgentGateway`: `ge-private-egress-gateway`, `associatedAgentRegistry`: `us-central1`) |
-| **MCP DataConnector** | `discoveryengine.googleapis.com/DataConnector` | `projects/679926387543/locations/global/collections/ge-mcp-psc-collector/dataConnector` (`mcp_server_source: REGISTRY_MCP`, `use_agent_gateway_egress: true`, `state: ACTIVE`) |
-| **Registered A2A Agent** | `discoveryengine.googleapis.com/Agent` | `.../engines/ge-mcp-psc-vpcsc-app/assistants/default_assistant/agents/15947165608667115817` (`Internal Finance Analysis A2A Agent`, `state: ENABLED`) |
-| **Agent Gateway** | `networkservices.googleapis.com/AgentGateway` | `projects/wortz-project-352116/locations/us-central1/agentGateways/ge-private-egress-gateway` (`governedAccessPath: AGENT_TO_ANYWHERE`, `dnsPeeringConfig`: `run.app.`, `internal.corp.example.com.`) |
-| **Agent Registry** | `agentregistry.googleapis.com/Service` | `internal-data-mcp` (`mcpServers/agentregistry-00000000-0000-0000-4213-411a00778a8c`), `onprem-erp-mcp` (`mcpServers/agentregistry-00000000-0000-0000-cf69-cfc1c5295c6f`), `internal-finance-a2a` (`agents` view) |
+| **Gemini Enterprise App** | `discoveryengine.googleapis.com/Engine` | `projects/123456789012/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app` (`defaultEgressAgentGateway`: `ge-private-egress-gateway`, `associatedAgentRegistry`: `us-central1`) |
+| **MCP DataConnector** | `discoveryengine.googleapis.com/DataConnector` | `projects/123456789012/locations/global/collections/ge-mcp-psc-collector/dataConnector` (`mcp_server_source: REGISTRY_MCP`, `use_agent_gateway_egress: true`, `state: ACTIVE`) |
+| **Registered A2A Agent** | `discoveryengine.googleapis.com/Agent` | `.../engines/ge-mcp-psc-vpcsc-app/assistants/default_assistant/agents/10000000000000000001` (`Internal Finance Analysis A2A Agent`, `state: ENABLED`) |
+| **Agent Gateway** | `networkservices.googleapis.com/AgentGateway` | `projects/your-gcp-project-id/locations/us-central1/agentGateways/ge-private-egress-gateway` (`governedAccessPath: AGENT_TO_ANYWHERE`, `dnsPeeringConfig`: `run.app.`, `internal.corp.example.com.`) |
+| **Agent Registry** | `agentregistry.googleapis.com/Service` | `internal-data-mcp` (`mcpServers/agentregistry-00000000-0000-0000-11111111-1111-1111-1111-111111111111`), `onprem-erp-mcp` (`mcpServers/agentregistry-00000000-0000-0000-22222222-2222-2222-2222-222222222222`), `internal-finance-a2a` (`agents` view) |
 | **IAP v2 & IAM v3 UAP** | `AuthzExtension` / `AuthzPolicy` / `AccessPolicy` | `ge-iap-authz-ext` (`failOpen: false`, `V2`) + `ge-gateway-iap-policy` (`REQUEST_AUTHZ`) + `ge-mcp-a2a-uap` (`ge-mcp-a2a-uap-binding` enforcing `iap.googleapis.com/resources.egressViaIAP` with CEL rules) |
-| **PSC Network Attachment** | `compute.googleapis.com/NetworkAttachment` | `projects/wortz-project-352116/regions/us-central1/networkAttachments/ge-agent-psc-attachment` (`ACCEPTED` consumer IP `10.128.20.2` in `ge-agent-psc-subnet` `10.128.20.0/28`) |
+| **PSC Network Attachment** | `compute.googleapis.com/NetworkAttachment` | `projects/your-gcp-project-id/regions/us-central1/networkAttachments/ge-agent-psc-attachment` (`ACCEPTED` consumer IP `10.128.20.2` in `ge-agent-psc-subnet` `10.128.20.0/28`) |
 | **PSC Google APIs Endpoint** | `compute.googleapis.com/GlobalForwardingRule` | `psc2gapis` (`172.16.20.20` on `enterprise-vpc`) + Split-Horizon Private Cloud DNS (`priv-zone-run` for `*.run.app.` -> `172.16.20.20` and `internal-corp-psc-zone` for `*.internal.corp.example.com.`) |
-| **Private MCP & A2A Server** | `run.googleapis.com/Service` | `projects/wortz-project-352116/locations/us-central1/services/internal-data-mcp` (`INGRESS_TRAFFIC_INTERNAL_ONLY`) |
+| **Private MCP & A2A Server** | `run.googleapis.com/Service` | `projects/your-gcp-project-id/locations/us-central1/services/internal-data-mcp` (`INGRESS_TRAFFIC_INTERNAL_ONLY`) |
 
 ### Verified 4-Layer Cloud Logging Telemetry
 1. **Agent Gateway + IAP v2 Governance (`resource.type="networkservices.googleapis.com/Gateway"`):**
@@ -125,7 +125,7 @@ All components from the [Companion Google Doc Guide](https://docs.google.com/doc
    * `tools/call` (`query_financial_metrics`) -> `200 ALLOWED` (returns `$96,450M` revenue and `33.4%` operating margin to Gemini Enterprise `:streamAssist`)
    * `tools/call` (`delete_ledger_record` / unauthorized tool) -> `403 DENIED` by IAM v3 CEL policy
 2. **Cloud DNS Private Resolution (`resource.type="dns_query"`):**
-   * `queryName: "internal-data-mcp-679926387543.us-central1.run.app."` -> `rdata: "172.16.20.20"` (`sourceIP: 35.199.192.230` via DNS Peering into `enterprise-vpc`)
+   * `queryName: "internal-data-mcp-123456789012.us-central1.run.app."` -> `rdata: "172.16.20.20"` (`sourceIP: 35.199.192.1` via DNS Peering into `enterprise-vpc`)
 3. **VPC Firewall Traversal (`logName:"compute.googleapis.com%2Ffirewall"`):**
    * `SRC: 10.128.20.2` (Agent Gateway PSC Network Attachment IP) -> `DEST: 172.16.20.20:443` (PSC Endpoint for Private Cloud Run) -> `DISPOSITION: ALLOWED`
 4. **Private Cloud Run Execution (`resource.type="cloud_run_revision"`):**

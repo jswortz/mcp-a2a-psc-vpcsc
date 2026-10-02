@@ -84,13 +84,38 @@ class RunningA2AAgentServer:
         body: dict[str, Any] = await request.json()
         jsonrpc_id = body.get("id", 1)
         params: dict[str, Any] = body.get("params") or {}
-        task_id = str(params.get("id", "task-default"))
         msg_obj = params.get("message") or {}
+        is_a2a_v03_sdk = isinstance(msg_obj.get("parts"), list) or "messageId" in msg_obj
+        task_id = str(params.get("id") or msg_obj.get("taskId") or "task-variance-q3-2026")
+        context_id = str(
+            params.get("contextId")
+            or msg_obj.get("contextId")
+            or f"ctx-{task_id}"
+        )
         user_message = str(msg_obj.get("text", ""))
         if not user_message and isinstance(msg_obj.get("parts"), list) and msg_obj["parts"]:
-            user_message = str(msg_obj["parts"][0].get("text", ""))
+            first_part = msg_obj["parts"][0]
+            if isinstance(first_part, dict):
+                user_message = str(first_part.get("text", ""))
 
-        summary_text = f"Processed private A2A request: {user_message[:60]}"
+        summary_text = (
+            f"Processed private A2A request: {user_message[:60]} | "
+            "GOOG Q3-2026 Variance Report: Revenue $96,450M (+15.1% YoY, +$2,150M vs. plan), "
+            "Operating Margin 33.4% (+180 bps vs. plan), Free Cash Flow $24,900M (FAVORABLE)."
+        )
+        status_field: Any = (
+            {
+                "state": "completed",
+                "message": {
+                    "kind": "message",
+                    "messageId": f"msg-{task_id}",
+                    "role": "agent",
+                    "parts": [{"kind": "text", "text": summary_text}],
+                },
+            }
+            if is_a2a_v03_sdk
+            else "COMPLETED"
+        )
         return web.json_response(
             {
                 "jsonrpc": "2.0",
@@ -99,10 +124,13 @@ class RunningA2AAgentServer:
                     "kind": "task",
                     "id": task_id,
                     "taskId": task_id,
-                    "status": "COMPLETED",
+                    "contextId": context_id,
+                    "status": status_field,
                     "artifacts": [
                         {
+                            "artifactId": f"artifact-{task_id}",
                             "name": "variance_report",
+                            "description": summary_text,
                             "summary": summary_text,
                             "parts": [{"kind": "text", "text": summary_text}],
                         }

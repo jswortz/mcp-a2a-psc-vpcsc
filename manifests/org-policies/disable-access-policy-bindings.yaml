@@ -1,4 +1,4 @@
-name: projects/wortz-project-352116/policies/iam.managed.disableAccessPolicyBindings
+name: projects/your-gcp-project-id/policies/iam.managed.disableAccessPolicyBindings
 spec:
   rules:
     - enforce: false

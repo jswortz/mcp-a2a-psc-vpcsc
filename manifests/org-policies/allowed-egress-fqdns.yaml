@@ -1,4 +1,4 @@
-name: projects/wortz-project-352116/policies/discoveryengine.managed.allowedEgressFqdns
+name: projects/your-gcp-project-id/policies/discoveryengine.managed.allowedEgressFqdns
 spec:
   rules:
     - values:
