@@ -112,6 +112,8 @@ class RunningA2AAgentServer:
         )
 
     async def start(self) -> None:
+        if self._runner is not None:
+            await self.stop()
         app = web.Application(middlewares=[security_headers_middleware])
         app.router.add_get("/.well-known/agent-card.json", self._handle_agent_card)
         app.router.add_post("/a2a", self._handle_a2a_post)
@@ -126,3 +128,7 @@ class RunningA2AAgentServer:
     async def stop(self) -> None:
         if self._runner is not None:
             await self._runner.cleanup()
+            self._runner = None
+            self._site = None
+        self.port = 0
+

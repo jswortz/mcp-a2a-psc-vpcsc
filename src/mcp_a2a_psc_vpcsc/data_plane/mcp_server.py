@@ -242,6 +242,8 @@ class RunningMCPServer:
         )
 
     async def start(self) -> None:
+        if self._runner is not None:
+            await self.stop()
         app = web.Application(middlewares=[security_headers_middleware])
         app.router.add_post("/mcp", self._handle_mcp_post)
         app.router.add_post("/oauth/register", self._handle_dcr_rejected)
@@ -256,3 +258,7 @@ class RunningMCPServer:
     async def stop(self) -> None:
         if self._runner is not None:
             await self._runner.cleanup()
+            self._runner = None
+            self._site = None
+        self.port = 0
+

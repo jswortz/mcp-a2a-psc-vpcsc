@@ -2,7 +2,22 @@
 
 This repository implements and proves the end-to-end architecture for connecting **Gemini Enterprise App (`discoveryengine.googleapis.com`)** and **Vertex AI Agent Runtime (`aiplatform.googleapis.com`)** to private **Custom MCP (BYO-MCP)** servers and **Agent2Agent (A2A)** workloads over **Private Service Connect (PSC)** inside a **VPC Service Controls (VPC-SC)** perimeter.
 
-* **Companion Google Doc Guide (with 5-Slide Executive Walkthrough):** [Private Connectivity Guide: Custom MCP (BYO-MCP) & A2A Agents with PSC and VPC-SC](https://docs.google.com/document/d/16bjMEo-vj8HLremQuTdE3l6hASpZ8qp-OO019x9SmrQ/edit)
+* **Companion Google Doc Guide (with 6-Slide Executive Walkthrough):** [Private Connectivity Guide: Custom MCP (BYO-MCP) & A2A Agents with PSC and VPC-SC](https://docs.google.com/document/d/16bjMEo-vj8HLremQuTdE3l6hASpZ8qp-OO019x9SmrQ/edit)
+* **Executive 6-Slide Google Slides Presentation (16:9 HD):** [Executive Walkthrough: Connecting Custom MCP (BYO-MCP) & A2A with PSC and VPC-SC](https://docs.google.com/presentation/d/1zETenOHeK_W2swO5CU2c0gRVI2zy6A6UnCx7kTBfqqs/edit)
+* **8-Lesson Interactive Tutorial Notebook:** [`notebooks/agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb`](notebooks/agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb)
+
+---
+
+## Executive 6-Slide Walkthrough
+
+| Slide | Focus ("What" vs. "How") | Slide Asset (`2400x1350` PNG) |
+| :--- | :--- | :--- |
+| **Slide 1: Executive Overview** | **The "What" & "Why":** Why public endpoints fail in VPC-SC and the 3 core architectural pillars (Private Network Bridge, Governed AI Egress, VPC-SC & Tool Security). | [`slide-1-executive-overview.png`](notebooks/assets/slides/slide-1-executive-overview.png) |
+| **Slide 2: Reference Architecture** | **Control Plane (Registry) vs. Data Plane (PSC):** How requests flow across Zone 1 (AI Runtime & Control Plane), Zone 2 (PSC & Split-Horizon DNS Bridge), and Zone 3 (Customer VPC & Outside-VPC Workloads). | [`slide-2-reference-architecture.png`](notebooks/assets/slides/slide-2-reference-architecture.png) |
+| **Slide 3: Private Egress Foundation** | **Steps 1–3 ("How" Part 1):** Creating the Consumer PSC subnet (`10.128.20.0/28`) & Network Attachment, Split-Horizon Cloud DNS + Internal ALB, and `AgentGateway` (`v1alpha1`). | [`slide-3-private-egress-foundation.png`](notebooks/assets/slides/slide-3-private-egress-foundation.png) |
+| **Slide 4: Connecting MCP & A2A** | **Steps 4–5 ("How" Part 2):** Registering writable `Services` in Agent Registry, binding `REGISTRY_MCP` DataConnector (`use_agent_gateway_egress: true`), and wiring bidirectional A2A. | [`slide-4-connecting-mcp-and-a2a.png`](notebooks/assets/slides/slide-4-connecting-mcp-and-a2a.png) |
+| **Slide 5: VPC-SC & Zero-Trust Rules** | **Step 6 ("How" Part 3):** Mandatory VPC-SC perimeter ordering, 4 Organization Policies, split IAM v3 + IAP v2 CEL rules, and Vertex AI Model Armor (`INSPECT_AND_BLOCK`). | [`slide-5-vpc-sc-and-zero-trust.png`](notebooks/assets/slides/slide-5-vpc-sc-and-zero-trust.png) |
+| **Slide 6: Live GCP Proof & Notebook** | **Live Verification & Idempotency:** Live E2E proof on Gemini Enterprise (`ge-mcp-psc-vpcsc-app`), 4-layer idempotency verification, and the 8-lesson interactive tutorial notebook. | [`slide-6-live-e2e-and-idempotency.png`](notebooks/assets/slides/slide-6-live-e2e-and-idempotency.png) |
 
 ---
 
