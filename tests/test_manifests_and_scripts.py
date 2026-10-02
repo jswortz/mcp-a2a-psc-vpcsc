@@ -109,3 +109,34 @@ def test_shell_scripts_syntax_and_dry_run() -> None:
         assert deploy_res.returncode == 0, f"DRY_RUN failed for {run_script}: {deploy_res.stderr}"
         assert "=== Provisioning Sequence Completed Successfully ===" in deploy_res.stdout
 
+
+import ast
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_tutorial_notebook_executes_cleanly() -> None:
+    """Execute all code cells of the teaching tutorial notebook in order to verify zero errors."""
+    nb_path = REPO_ROOT / "notebooks" / "agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb"
+    assert nb_path.is_file(), "Tutorial notebook is missing"
+    nb_data = json.loads(nb_path.read_text(encoding="utf-8"))
+    cells = nb_data.get("cells", [])
+    assert len(cells) >= 12
+
+    code_cells = [c for c in cells if c.get("cell_type") == "code"]
+    assert len(code_cells) >= 6
+
+    ns: dict[str, object] = {}
+    for idx, cell in enumerate(code_cells):
+        source = "".join(cell.get("source", [])) if isinstance(cell.get("source"), list) else str(cell.get("source", ""))
+        compiled = compile(
+            source,
+            filename=f"tutorial_cell_{idx}.py",
+            mode="exec",
+            flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT,
+        )
+        result = eval(compiled, ns, ns)
+        if result is not None and hasattr(result, "__await__"):
+            await result
+
+

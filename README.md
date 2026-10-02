@@ -62,6 +62,7 @@ flowchart LR
 ## Repository Layout
 
 * `manifests/` — Declarative GCP YAML/JSON configs (`connectivity-template.yaml`, `agent-gateway.yaml`, `iap-authz-extension.yaml`, `iap-authz-policy.yaml`, `iap-uap-policy.json`, `org-policies/*.yaml`, `specs/toolspec.json`, `specs/agent-card.json`).
+* `notebooks/agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb` — Interactive step-by-step teaching tutorial covering Control Plane vs. Data Plane, PSC Network Attachment + Split-Horizon DNS, Inside-VPC vs. Outside-VPC Hybrid NEG routing, IAP v2 / IAM v3 CEL governance, Model Armor, failure-mode diagnostics, and live Gemini Enterprise verification.
 * `scripts/deploy_gcp_infrastructure.sh` — Idempotent Steps 1–6 `gcloud` provisioning script (supports `DRY_RUN=true`).
 * `scripts/publish_private_github_repo.sh` — One-command helper to create and push to a private GitHub repository via `gh repo create --private`.
 * `src/mcp_a2a_psc_vpcsc/` — Runnable Python reference implementation of the Control Plane (`AgentRegistryStore`) and Data Plane (`RunningMCPServer`, `RunningA2AAgentServer`, `PSCNetworkAttachmentBridge`, `InternalCrossRegionALB`, `ConsumerPSCEndpoint`, `AgentGatewayProxy`, `VPCServiceControlsPerimeter`, `ModelArmorInspector`).
