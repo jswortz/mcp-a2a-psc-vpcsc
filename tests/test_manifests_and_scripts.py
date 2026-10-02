@@ -119,9 +119,20 @@ async def test_tutorial_notebook_executes_cleanly() -> None:
     """Execute all code cells of the teaching tutorial notebook in order to verify zero errors."""
     nb_path = REPO_ROOT / "notebooks" / "agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb"
     assert nb_path.is_file(), "Tutorial notebook is missing"
+
+    overview_png = REPO_ROOT / "notebooks" / "assets" / "architecture_overview_highres.png"
+    blueprint_png = REPO_ROOT / "notebooks" / "assets" / "agent_gateway_psc_vpcsc_architecture.png"
+    assert overview_png.is_file() and overview_png.stat().st_size > 100_000
+    assert blueprint_png.is_file() and blueprint_png.stat().st_size > 100_000
+
     nb_data = json.loads(nb_path.read_text(encoding="utf-8"))
     cells = nb_data.get("cells", [])
     assert len(cells) >= 12
+
+    # Verify high-res PNGs are embedded in cell 1 outputs
+    cell1_outputs = cells[1].get("outputs", [])
+    png_outputs = [o for o in cell1_outputs if "image/png" in o.get("data", {})]
+    assert len(png_outputs) == 2
 
     code_cells = [c for c in cells if c.get("cell_type") == "code"]
     assert len(code_cells) >= 6
@@ -138,5 +149,6 @@ async def test_tutorial_notebook_executes_cleanly() -> None:
         result = eval(compiled, ns, ns)
         if result is not None and hasattr(result, "__await__"):
             await result
+
 
 
