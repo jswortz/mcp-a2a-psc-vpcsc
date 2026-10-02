@@ -115,7 +115,8 @@ All components from the [Companion Google Doc Guide](notebooks/assets/slides/sli
 | **IAP v2 & IAM v3 UAP** | `AuthzExtension` / `AuthzPolicy` / `AccessPolicy` | `ge-iap-authz-ext` (`failOpen: false`, `V2`) + `ge-gateway-iap-policy` (`REQUEST_AUTHZ`) + `ge-mcp-a2a-uap` (`ge-mcp-a2a-uap-binding` enforcing `iap.googleapis.com/resources.egressViaIAP` with CEL rules) |
 | **PSC Network Attachment** | `compute.googleapis.com/NetworkAttachment` | `projects/your-gcp-project-id/regions/us-central1/networkAttachments/ge-agent-psc-attachment` (`ACCEPTED` consumer IP `10.128.20.2` in `ge-agent-psc-subnet` `10.128.20.0/28`) |
 | **PSC Google APIs Endpoint** | `compute.googleapis.com/GlobalForwardingRule` | `psc2gapis` (`172.16.20.20` on `enterprise-vpc`) + Split-Horizon Private Cloud DNS (`priv-zone-run` for `*.run.app.` -> `172.16.20.20` and `internal-corp-psc-zone` for `*.internal.corp.example.com.`) |
-| **Private MCP & A2A Server** | `run.googleapis.com/Service` | `projects/your-gcp-project-id/locations/us-central1/services/internal-data-mcp` (`INGRESS_TRAFFIC_INTERNAL_ONLY`) |
+| **Private MCP Server** | `run.googleapis.com/Service` | `projects/your-gcp-project-id/locations/us-central1/services/internal-data-mcp` (`INGRESS_TRAFFIC_INTERNAL_ONLY`, `/mcp`) |
+| **Dedicated Private A2A Agent** | `run.googleapis.com/Service` | `projects/your-gcp-project-id/locations/us-central1/services/internal-finance-a2a` (`INGRESS_TRAFFIC_INTERNAL_ONLY`, `/a2a`, `/.well-known/agent.json`) |
 
 ### Verified 4-Layer Cloud Logging Telemetry
 1. **Agent Gateway + IAP v2 Governance (`resource.type="networkservices.googleapis.com/Gateway"`):**
@@ -123,13 +124,41 @@ All components from the [Companion Google Doc Guide](notebooks/assets/slides/sli
    * `notifications/initialized` -> `202 ALLOWED`
    * `tools/list` -> `200 ALLOWED`
    * `tools/call` (`query_financial_metrics`) -> `200 ALLOWED` (returns `$96,450M` revenue and `33.4%` operating margin to Gemini Enterprise `:streamAssist`)
+   * `message/send` (`internal-finance-a2a` on `/a2a`) -> `200 ALLOWED` (returns `Q3-2026 Variance Report` to Gemini Enterprise `/a2a/v1/message:send`)
    * `tools/call` (`delete_ledger_record` / unauthorized tool) -> `403 DENIED` by IAM v3 CEL policy
 2. **Cloud DNS Private Resolution (`resource.type="dns_query"`):**
    * `queryName: "internal-data-mcp-123456789012.us-central1.run.app."` -> `rdata: "172.16.20.20"` (`sourceIP: 35.199.192.1` via DNS Peering into `enterprise-vpc`)
+   * `queryName: "internal-finance-a2a-123456789012.us-central1.run.app."` -> `rdata: "172.16.20.20"` (`sourceIP: 35.199.192.1` via DNS Peering into `enterprise-vpc`)
 3. **VPC Firewall Traversal (`logName:"compute.googleapis.com%2Ffirewall"`):**
    * `SRC: 10.128.20.2` (Agent Gateway PSC Network Attachment IP) -> `DEST: 172.16.20.20:443` (PSC Endpoint for Private Cloud Run) -> `DISPOSITION: ALLOWED`
 4. **Private Cloud Run Execution (`resource.type="cloud_run_revision"`):**
-   * `POST /mcp` (`200 OK`) serving JSON-RPC 2.0 Streamable HTTP with `INGRESS_TRAFFIC_INTERNAL_ONLY`
+   * `POST /mcp` on `internal-data-mcp` (`200 OK`) serving JSON-RPC 2.0 Streamable HTTP with `INGRESS_TRAFFIC_INTERNAL_ONLY`
+   * `POST /a2a` on `internal-finance-a2a` (`200 OK`) serving A2A v0.3.0 `message/send` with `INGRESS_TRAFFIC_INTERNAL_ONLY`
+
+---
+
+## Official Google Cloud Documentation (`docs.cloud.google.com`)
+
+All API calls, `gcloud` commands, and architectural patterns in this repository follow the official Google Cloud documentation:
+
+1. **Agent Gateway & Private Service Connect (PSC):**
+   * [Deploy Agent Gateway for Gemini Enterprise](https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/agent-gateway-ge-deploy)
+   * [Set up an Agent Gateway](https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/set-up-agent-gateway)
+   * [Create and manage PSC network attachments](https://docs.cloud.google.com/vpc/docs/create-manage-network-attachments)
+2. **Agent Registry & Custom MCP (BYO-MCP) Servers:**
+   * [Register MCP servers in Agent Registry](https://docs.cloud.google.com/agent-registry/register-mcp-servers)
+   * [Import and govern MCP servers from Agent Registry in Gemini Enterprise](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/import-govern-mcp-server-agent-registry)
+   * [Connect a custom MCP server to Gemini Enterprise](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
+3. **Agent2Agent (A2A) Registration & Invocation:**
+   * [Register agents in Agent Registry](https://docs.cloud.google.com/agent-registry/register-agents)
+   * [Import and govern agents from Agent Registry in Gemini Enterprise](https://docs.cloud.google.com/gemini/enterprise/docs/import-govern-agent-registry)
+   * [Register and manage A2A agents](https://docs.cloud.google.com/gemini/enterprise/docs/register-and-manage-an-a2a-agent) — Documents `v1alpha` `assistants/default_assistant/agents` registration and `X-Serverless-Authorization` + `Authorization` header coexistence on Cloud Run.
+   * [Call a specific agent with the StreamAssist API](https://docs.cloud.google.com/gemini/enterprise/docs/invoke-agent-streamassist) — Documents `POST /v1/projects/{PROJECT_ID}/locations/{LOCATION}/collections/default_collection/engines/{APP_ID}/assistants/default_assistant:streamAssist` for conversational queries and read-only retrieval over MCP connectors, and notes that A2A agents registered to a Gemini Enterprise app are invoked via their registry A2A endpoint rather than `:streamAssist`.
+   * [Call an agent using its registry A2A endpoint](https://docs.cloud.google.com/gemini/enterprise/docs/invoke-agent-a2a) — Documents the official A2A invocation methods:
+     * `GET https://{LOCATION-}discoveryengine.googleapis.com/v1/projects/{PROJECT_NUMBER}/locations/{LOCATION}/collections/default_collection/engines/{ENGINE_ID}/assistants/default_assistant/agents/{AGENT_ID}/a2a/v1/card`
+     * `POST https://{LOCATION-}discoveryengine.googleapis.com/v1/projects/{PROJECT_NUMBER}/locations/{LOCATION}/collections/default_collection/engines/{ENGINE_ID}/assistants/default_assistant/agents/{AGENT_ID}/a2a/v1/message:send` (`role: "ROLE_USER"`, `content: [{"text": "..."}]`, `messageId: "<UUID>"`)
+4. **VPC Service Controls (VPC-SC):**
+   * [Secure your Gemini Enterprise app with VPC Service Controls](https://docs.cloud.google.com/gemini/enterprise/docs/use-vpc-service-controls)
 
 ---
 
@@ -138,4 +167,5 @@ All components from the [Companion Google Doc Guide](notebooks/assets/slides/sli
 ```bash
 ./scripts/publish_private_github_repo.sh mcp-a2a-psc-vpcsc
 ```
+
 

@@ -59,9 +59,16 @@ echo "=== 2. Provision PSC Network Attachment, Private DNS, Agent Gateway & Agen
 DRY_RUN="${DRY_RUN}" ./scripts/deploy_gcp_infrastructure.sh
 
 echo "=== 3. Create / Bind New Gemini Enterprise App (Discovery Engine) to Agent Gateway & A2A Agent ==="
+# Official Documentation References:
+# - Deploy Agent Gateway for Gemini Enterprise: https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/agent-gateway-ge-deploy
+# - Import & Govern MCP Servers from Agent Registry: https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/import-govern-mcp-server-agent-registry
+# - Import & Govern A2A Agents from Agent Registry: https://docs.cloud.google.com/gemini/enterprise/docs/import-govern-agent-registry
+# - Call an Agent using streamAssist: https://docs.cloud.google.com/gemini/enterprise/docs/invoke-agent-streamassist
+# - Call an A2A Agent using its Registry A2A Endpoint: https://docs.cloud.google.com/gemini/enterprise/docs/invoke-agent-a2a
 if [[ "${DRY_RUN}" == "true" ]]; then
   echo "[DRY-RUN] POST/PATCH https://discoveryengine.googleapis.com/v1alpha/projects/${GCP_PROJECT_ID}/locations/${GE_APP_LOCATION}/collections/default_collection/engines/${GE_ENGINE_ID}"
   echo "[DRY-RUN] POST/PATCH https://discoveryengine.googleapis.com/v1alpha/projects/${GCP_PROJECT_NUMBER}/locations/${GE_APP_LOCATION}/collections/default_collection/engines/${GE_ENGINE_ID}/assistants/default_assistant/agents"
+  echo "[DRY-RUN] GET/POST https://discoveryengine.googleapis.com/v1/projects/${GCP_PROJECT_NUMBER}/locations/${GE_APP_LOCATION}/collections/default_collection/engines/${GE_ENGINE_ID}/assistants/default_assistant/agents/{AGENT_ID}/a2a/v1/card & /a2a/v1/message:send"
 else
   ACCESS_TOKEN="$(gcloud auth print-access-token)"
   curl -sS -X PATCH \
@@ -90,4 +97,5 @@ if [[ "${DRY_RUN}" == "true" ]]; then
 else
   RUN_LIVE_GCP_E2E=true PYTHONPATH=src python3 -m pytest tests/test_live_gcp_gemini_enterprise.py -v
 fi
+
 

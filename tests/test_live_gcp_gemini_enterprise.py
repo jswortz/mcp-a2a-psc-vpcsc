@@ -220,7 +220,16 @@ def test_live_gcp_fresh_gemini_enterprise_app_and_mcp_over_psc() -> None:
     reason="Live GCP test requires unsandboxed gcloud access; run via ./scripts/run_live_gcp_e2e_proof.sh",
 )
 def test_live_gemini_enterprise_a2a_agent_invocation_and_idempotency() -> None:
-    """Verify live Gemini Enterprise A2A Agent invocation over Agent Gateway + PSC to dedicated internal-finance-a2a."""
+    """Verify live Gemini Enterprise A2A Agent invocation using official documented A2A endpoints.
+
+    Follows https://docs.cloud.google.com/gemini/enterprise/docs/invoke-agent-a2a:
+    1. Discover agent in v1alpha assistant agents list & Agent Registry.
+    2. Fetch agent card via GET .../assistants/default_assistant/agents/{AGENT_ID}/a2a/v1/card.
+    3. Invoke agent twice consecutively via POST .../a2a/v1/message:send with role=ROLE_USER,
+       content=[{"text": ...}], and unique messageId.
+    """
+    import uuid
+
     token = _gcloud_access_token()
     headers = {
         "Authorization": f"Bearer {token}",
@@ -229,7 +238,7 @@ def test_live_gemini_enterprise_a2a_agent_invocation_and_idempotency() -> None:
     }
 
     with httpx.Client(timeout=60.0) as client:
-        # 1. Discover the registered A2A Agent on the Gemini Enterprise Assistant
+        # Step 1: Discover the registered A2A Agent on the Gemini Enterprise Assistant (v1alpha per docs)
         agents_list_url = (
             f"https://discoveryengine.googleapis.com/v1alpha/"
             f"projects/{PROJECT_ID}/locations/{GE_LOCATION}/collections/default_collection/"
@@ -247,41 +256,45 @@ def test_live_gemini_enterprise_a2a_agent_invocation_and_idempotency() -> None:
         assert finance_agents[0].get("state") == "ENABLED"
         assert "internal-finance-a2a" in finance_agents[0].get("a2aAgentDefinition", {}).get("jsonAgentCard", "")
 
-        # 2. Invoke the A2A Agent twice consecutively via :streamAssist with agentsSpec.agentSpecs
-        assist_url = (
-            f"https://discoveryengine.googleapis.com/v1alpha/"
-            f"projects/{PROJECT_ID}/locations/{GE_LOCATION}/collections/default_collection/"
-            f"engines/{GE_ENGINE_ID}/assistants/default_assistant:streamAssist"
+        # Step 2: Fetch the agent card via documented GET /a2a/v1/card endpoint (uses PROJECT_NUMBER on v1)
+        base_a2a_url = (
+            f"https://discoveryengine.googleapis.com/v1/"
+            f"projects/{PROJECT_NUMBER}/locations/{GE_LOCATION}/collections/default_collection/"
+            f"engines/{GE_ENGINE_ID}/assistants/default_assistant/agents/{a2a_agent_id}/a2a"
         )
+        card_resp = client.get(f"{base_a2a_url}/v1/card", headers=headers)
+        assert card_resp.status_code == 200, f"A2A GET /v1/card failed: {card_resp.text}"
+        card_body = card_resp.json()
+        assert "Internal Finance" in card_body.get("name", "")
+
+        # Step 3: Send 2 consecutive messages via documented POST /a2a/v1/message:send endpoint
         for attempt in (1, 2):
-            resp = client.post(
-                assist_url,
+            send_resp = client.post(
+                f"{base_a2a_url}/v1/message:send",
                 headers=headers,
                 json={
-                    "query": {
-                        "text": "Analyze GOOG Q3-2026 financial variance and executive margin highlights."
-                    },
-                    "agentsSpec": {
-                        "agentSpecs": [
-                            {"agentId": a2a_agent_id}
-                        ]
-                    },
+                    "message": {
+                        "role": "ROLE_USER",
+                        "content": [
+                            {
+                                "text": "Analyze GOOG Q3-2026 financial variance and executive margin highlights."
+                            }
+                        ],
+                        "messageId": str(uuid.uuid4()),
+                    }
                 },
             )
-            assert resp.status_code == 200, f"A2A streamAssist attempt #{attempt} failed: {resp.text}"
-            chunks = resp.json()
-            full_reply_text = "".join(
-                reply.get("groundedContent", {}).get("content", {}).get("text", "")
-                for chunk in chunks
-                for reply in chunk.get("answer", {}).get("replies", [])
+            assert send_resp.status_code == 200, (
+                f"A2A POST /v1/message:send attempt #{attempt} failed: {send_resp.text}"
             )
-            body_text = full_reply_text + " " + json.dumps(chunks)
-            assert '"state": "SUCCEEDED"' in body_text, (
-                f"Expected SUCCEEDED state on A2A streamAssist attempt #{attempt}: {body_text}"
+            send_body = send_resp.json()
+            msg = send_body.get("message", {})
+            assert msg.get("role") == "ROLE_AGENT", f"Expected ROLE_AGENT: {send_body}"
+            reply_text = "".join(part.get("text", "") for part in msg.get("content", []))
+            assert "96,450" in reply_text and "33.4%" in reply_text, (
+                f"Expected Q3-2026 variance report from internal-finance-a2a on attempt #{attempt}: {reply_text}"
             )
-            assert "96,450" in body_text or "Processed private A2A request" in body_text, (
-                f"Expected A2A variance report from internal-finance-a2a on attempt #{attempt}: {body_text}"
-            )
+
 
 
 
