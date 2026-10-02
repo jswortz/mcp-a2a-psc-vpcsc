@@ -20,76 +20,218 @@ SAFE_QUARTER_RE = re.compile(r"^Q[1-4]-20[2-3][0-9]$")
 class RunningMCPServer:
     """Live HTTP MCP Server listening strictly on 127.0.0.1 (never 0.0.0.0)."""
 
-    def __init__(self, token_manager: TokenManager, server_label: str) -> None:
+    def __init__(
+        self,
+        token_manager: TokenManager,
+        server_label: str,
+        allow_gateway_proxied_requests: bool = False,
+    ) -> None:
         self._token_manager = token_manager
         self._server_label = server_label
+        self._allow_gateway_proxied = allow_gateway_proxied_requests
         self._rate_limiter = SlidingWindowRateLimiter(max_requests=100, window_seconds=60.0)
         self._runner: web.AppRunner | None = None
         self._site: web.TCPSite | None = None
         self.port: int = 0
 
-    async def _handle_mcp_post(self, request: web.Request) -> web.Response:
-        # Reject static API keys inside VPC-SC
+    def _authenticate_request(self, request: web.Request) -> tuple[str | None, web.Response | None]:
+        """Validate OAuth Bearer JWT and SPIFFE identity; returns (principal, error_response)."""
         if "X-API-Key" in request.headers:
-            return web.json_response(
+            return None, web.json_response(
                 {"error": "Static API keys are prohibited inside VPC-SC; use OAuth 2.0 Bearer JWT."},
                 status=401,
             )
 
-        try:
-            claims = self._token_manager.verify_bearer_header(request.headers.get("Authorization"))
-            self._rate_limiter.check_rate_limit(str(claims.get("sub", "unknown")))
-        except SecurityValidationError as exc:
-            return web.json_response({"error": str(exc)}, status=401)
-
+        auth_header = request.headers.get("Authorization")
         agent_identity = request.headers.get("X-Agent-Identity", "")
-        if not agent_identity.startswith("principal://agents.global.org-"):
-            return web.json_response({"error": "Missing or invalid SPIFFE X-Agent-Identity"}, status=403)
+
+        if not self._allow_gateway_proxied:
+            try:
+                claims = self._token_manager.verify_bearer_header(auth_header)
+                self._rate_limiter.check_rate_limit(str(claims.get("sub", "unknown")))
+            except SecurityValidationError as exc:
+                return None, web.json_response({"error": str(exc)}, status=401)
+
+            if not agent_identity.startswith("principal://agents.global.org-"):
+                return None, web.json_response(
+                    {"error": "Missing or invalid SPIFFE X-Agent-Identity"},
+                    status=403,
+                )
+            return agent_identity, None
+
+        # Cloud Run behind Agent Gateway + IAP v2 + PSC Network Attachment:
+        # Always reject forged alg=none tokens or invalid HS256 tokens if Authorization is supplied.
+        if auth_header:
+            if not auth_header.startswith("Bearer "):
+                return None, web.json_response({"error": "Malformed Authorization header"}, status=401)
+            raw_token = auth_header.removeprefix("Bearer ").strip()
+            import jwt as pyjwt
+
+            try:
+                unverified_hdr = pyjwt.get_unverified_header(raw_token)
+            except pyjwt.PyJWTError:
+                return None, web.json_response({"error": "Invalid JWT header"}, status=401)
+            alg = str(unverified_hdr.get("alg", ""))
+            if alg.lower() == "none":
+                return None, web.json_response({"error": "Insecure JWT algorithm: none"}, status=401)
+            if alg == "HS256":
+                try:
+                    claims = self._token_manager.verify_bearer_header(auth_header)
+                    self._rate_limiter.check_rate_limit(str(claims.get("sub", "unknown")))
+                except SecurityValidationError as exc:
+                    return None, web.json_response({"error": str(exc)}, status=401)
+
+        if agent_identity and not agent_identity.startswith("principal://agents.global.org-"):
+            return None, web.json_response(
+                {"error": "Missing or invalid SPIFFE X-Agent-Identity"},
+                status=403,
+            )
+
+        principal = (
+            agent_identity
+            or "principal://agents.global.org-1060412978793.system.id.goog/resources/discoveryengine/projects/679926387543"
+        )
+        try:
+            self._rate_limiter.check_rate_limit(principal)
+        except SecurityValidationError as exc:
+            return None, web.json_response({"error": str(exc)}, status=429)
+        return principal, None
+
+    async def _handle_mcp_post(self, request: web.Request) -> web.Response:
+        _principal, err_resp = self._authenticate_request(request)
+        if err_resp is not None:
+            return err_resp
 
         body: dict[str, Any] = await request.json()
-        jsonrpc_id = body.get("id", 1)
-        method = body.get("method", "")
-        params: dict[str, Any] = body.get("params", {})
+        jsonrpc_id = body.get("id")
+        method = str(body.get("method", ""))
+        params: dict[str, Any] = body.get("params") or {}
+
+        # Handle MCP JSON-RPC notifications (e.g. notifications/initialized)
+        if method.startswith("notifications/") or ("id" not in body and method):
+            return web.Response(status=202)
+
+        if method == "ping":
+            return web.json_response({"jsonrpc": "2.0", "id": jsonrpc_id, "result": {}})
 
         if method == "initialize":
+            requested_version = str(params.get("protocolVersion") or "2025-03-26")
             return web.json_response(
                 {
                     "jsonrpc": "2.0",
-                    "id": jsonrpc_id,
+                    "id": jsonrpc_id if jsonrpc_id is not None else 1,
                     "result": {
-                        "protocolVersion": "2025-03-26",
+                        "protocolVersion": requested_version,
+                        "capabilities": {"tools": {"listChanged": False}},
                         "serverInfo": {"name": self._server_label, "version": "1.0.0"},
                     },
                 }
             )
 
+        if method == "tools/list":
+            return web.json_response(
+                {
+                    "jsonrpc": "2.0",
+                    "id": jsonrpc_id if jsonrpc_id is not None else 1,
+                    "result": {
+                        "tools": [
+                            {
+                                "name": "query_financial_metrics",
+                                "description": "Query internal financial metrics by ticker and fiscal quarter",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "ticker": {
+                                            "type": "string",
+                                            "description": "Company ticker symbol (e.g., GOOG)",
+                                        },
+                                        "quarter": {
+                                            "type": "string",
+                                            "description": "Fiscal quarter (e.g., Q3-2026)",
+                                        },
+                                    },
+                                    "required": ["ticker", "quarter"],
+                                },
+                                "annotations": {
+                                    "readOnlyHint": True,
+                                    "destructiveHint": False,
+                                    "idempotentHint": True,
+                                    "openWorldHint": False,
+                                },
+                            },
+                            {
+                                "name": "delete_ledger_record",
+                                "description": "Delete an internal ledger entry (mutating operation blocked by IAP CEL policy)",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "record_id": {
+                                            "type": "string",
+                                            "description": "Ledger record identifier",
+                                        }
+                                    },
+                                    "required": ["record_id"],
+                                },
+                                "annotations": {
+                                    "readOnlyHint": False,
+                                    "destructiveHint": True,
+                                    "idempotentHint": False,
+                                    "openWorldHint": False,
+                                },
+                            },
+                        ]
+                    },
+                }
+            )
+
         if method == "tools/call":
+            import json
+
             tool_name = str(params.get("name", ""))
-            args = params.get("arguments", {})
+            args = params.get("arguments") or {}
             if tool_name == "query_financial_metrics":
-                ticker = str(args.get("ticker", ""))
-                quarter = str(args.get("quarter", ""))
+                ticker = str(args.get("ticker", "")).strip().upper()
+                quarter = str(args.get("quarter", "")).strip().upper().replace(" ", "-")
                 if not SAFE_TICKER_RE.match(ticker) or not SAFE_QUARTER_RE.match(quarter):
                     return web.json_response(
-                        {"jsonrpc": "2.0", "id": jsonrpc_id, "error": {"code": -32602, "message": "Invalid input"}},
+                        {
+                            "jsonrpc": "2.0",
+                            "id": jsonrpc_id if jsonrpc_id is not None else 1,
+                            "error": {"code": -32602, "message": "Invalid input"},
+                        },
                         status=400,
                     )
+                payload_data = {
+                    "server_label": self._server_label,
+                    "ticker": ticker,
+                    "quarter": quarter,
+                    "revenue_usd_millions": 96450,
+                    "operating_margin_pct": 33.4,
+                }
                 return web.json_response(
                     {
                         "jsonrpc": "2.0",
-                        "id": jsonrpc_id,
+                        "id": jsonrpc_id if jsonrpc_id is not None else 1,
                         "result": {
-                            "server_label": self._server_label,
-                            "ticker": ticker,
-                            "quarter": quarter,
-                            "revenue_usd_millions": 96450,
-                            "operating_margin_pct": 33.4,
+                            **payload_data,
+                            "structuredContent": payload_data,
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": json.dumps(payload_data),
+                                }
+                            ],
+                            "isError": False,
                         },
                     }
                 )
 
         return web.json_response(
-            {"jsonrpc": "2.0", "id": jsonrpc_id, "error": {"code": -32601, "message": "Method not found"}},
+            {
+                "jsonrpc": "2.0",
+                "id": jsonrpc_id if jsonrpc_id is not None else 1,
+                "error": {"code": -32601, "message": "Method not found"},
+            },
             status=404,
         )
 

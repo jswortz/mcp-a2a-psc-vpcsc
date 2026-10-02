@@ -16,8 +16,20 @@ async def create_cloud_run_app() -> web.Application:
     """Create unified Cloud Run application serving /mcp, /a2a, and /healthz."""
     cfg = ArchitectureConfig()
     token_mgr = TokenManager(secret_key=cfg.jwt_secret)
-    mcp = RunningMCPServer(token_manager=token_mgr, server_label="cloud-run-internal-mcp")
-    a2a = RunningA2AAgentServer(token_manager=token_mgr)
+    service_url = os.getenv(
+        "PUBLIC_SERVICE_URL",
+        f"https://internal-data-mcp-{cfg.project_number}.{cfg.region}.run.app",
+    )
+    mcp = RunningMCPServer(
+        token_manager=token_mgr,
+        server_label="cloud-run-internal-mcp",
+        allow_gateway_proxied_requests=True,
+    )
+    a2a = RunningA2AAgentServer(
+        token_manager=token_mgr,
+        allow_gateway_proxied_requests=True,
+        endpoint_url=f"{service_url}/a2a",
+    )
 
     app = web.Application(middlewares=[security_headers_middleware])
     app.router.add_get("/healthz", lambda _req: web.json_response({"status": "ok"}))

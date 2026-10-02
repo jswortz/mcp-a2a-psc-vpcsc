@@ -5,8 +5,9 @@
       {
         "description": "Allow read-only MCP tools and approved Finance A2A agent for Enterprise Agents",
         "principals": [
-          "principal://agents.global.org-987654321098.system.id.goog/resources/aiplatform/projects/123456789012/locations/us-central1/reasoningEngines/1234567890",
-          "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/enterprise-pool/*"
+          "principalSet://iam.googleapis.com/organizations/1060412978793/*",
+          "principal://agents.global.org-1060412978793.system.id.goog/resources/discoveryengine/projects/679926387543/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app/*",
+          "serviceAccount:service-679926387543@gcp-sa-discoveryengine.iam.gserviceaccount.com"
         ],
         "effect": "ALLOW",
         "permissions": [
@@ -16,7 +17,40 @@
           "title": "RestrictToReadOnlyMcpToolsAndApprovedA2A",
           "expression": "destination.agent_registry.mcp_server.tool.annotations.read_only_hint == true || destination.agent_registry.agent.name == 'projects/wortz-project-352116/locations/us-central1/agents/internal-finance-a2a'"
         }
+      },
+      {
+        "description": "Allow MCP protocol handshake and tool discovery for registered MCP servers",
+        "principals": [
+          "principalSet://iam.googleapis.com/organizations/1060412978793/*",
+          "principal://agents.global.org-1060412978793.system.id.goog/resources/discoveryengine/projects/679926387543/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app/*",
+          "serviceAccount:service-679926387543@gcp-sa-discoveryengine.iam.gserviceaccount.com"
+        ],
+        "effect": "ALLOW",
+        "permissions": [
+          "iap.googleapis.com/resources.egressViaIAP"
+        ],
+        "condition": {
+          "title": "AllowRegisteredMcpHandshakeAndList",
+          "expression": "destination.is_registered == true && destination.agent_registry.mcp_server.method != 'tools/call'"
+        }
+      },
+      {
+        "description": "Allow read-only query_financial_metrics tool execution on registered MCP servers",
+        "principals": [
+          "principalSet://iam.googleapis.com/organizations/1060412978793/*",
+          "principal://agents.global.org-1060412978793.system.id.goog/resources/discoveryengine/projects/679926387543/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app/*",
+          "serviceAccount:service-679926387543@gcp-sa-discoveryengine.iam.gserviceaccount.com"
+        ],
+        "effect": "ALLOW",
+        "permissions": [
+          "iap.googleapis.com/resources.egressViaIAP"
+        ],
+        "condition": {
+          "title": "AllowQueryFinancialMetricsOnly",
+          "expression": "destination.is_registered == true && destination.agent_registry.mcp_server.method == 'tools/call' && destination.agent_registry.mcp_server.tool.name == 'query_financial_metrics'"
+        }
       }
     ]
   }
 }
+

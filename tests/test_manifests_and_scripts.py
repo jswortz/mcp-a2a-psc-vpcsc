@@ -47,12 +47,13 @@ def test_iap_authz_manifests_and_uap_policy() -> None:
 
     uap = json.loads((REPO_ROOT / "manifests" / "iap-uap-policy.json").read_text(encoding="utf-8"))
     rules = uap["details"]["rules"]
-    assert len(rules) == 1
+    assert len(rules) >= 1
     rule = rules[0]
     assert rule["effect"] == "ALLOW"
     assert "iap.googleapis.com/resources.egressViaIAP" in rule["permissions"]
     expr = rule["condition"]["expression"]
     assert "destination.agent_registry.mcp_server.tool.annotations.read_only_hint == true" in expr
+
 
 
 def test_four_mandatory_org_policies() -> None:

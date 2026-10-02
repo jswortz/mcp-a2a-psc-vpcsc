@@ -17,6 +17,10 @@
         },
         "required": ["ticker", "quarter"]
       },
+      "isReadOnly": true,
+      "isDestructive": false,
+      "isIdempotent": true,
+      "isOpenWorld": false,
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -37,6 +41,10 @@
         },
         "required": ["record_id"]
       },
+      "isReadOnly": false,
+      "isDestructive": true,
+      "isIdempotent": false,
+      "isOpenWorld": false,
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,

@@ -7,12 +7,24 @@ protocols:
 networkConfig:
   egress:
     agentConnectivityTemplate: projects/wortz-project-352116/locations/us-central1/agentConnectivityTemplates/ge-psc-egress-template
+    networkAttachment: projects/wortz-project-352116/regions/us-central1/networkAttachments/ge-agent-psc-attachment
+    dnsPeeringConfig:
+      - domain: run.app.
+        targetProject: wortz-project-352116
+        targetNetwork: enterprise-vpc
+      - domain: internal.corp.example.com.
+        targetProject: wortz-project-352116
+        targetNetwork: enterprise-vpc
 googleManaged:
   governedAccessPath: AGENT_TO_ANYWHERE
+  resourceUri: "//discoveryengine.googleapis.com/projects/679926387543/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app"
+registries:
+  - "//agentregistry.googleapis.com/projects/wortz-project-352116/locations/us-central1"
 registryBindings:
   - projects/wortz-project-352116/locations/us-central1
 governedResources:
-  - "//discoveryengine.googleapis.com/projects/wortz-project-352116/locations/global/collections/default_collection/engines/enterprise-search-app"
+  - "//discoveryengine.googleapis.com/projects/wortz-project-352116/locations/global/collections/default_collection/engines/ge-mcp-psc-vpcsc-app"
   - "//aiplatform.googleapis.com/projects/wortz-project-352116/locations/us-central1/reasoningEngines/1234567890"
 selfManaged:
-  resourceUri: projects/wortz-project-352116/regions/us-central1/subnetworks/enterprise-app-subnet
+  resourceUri: projects/wortz-project-352116/regions/us-central1/subnetworks/ge-agent-psc-subnet
+
