@@ -1,7 +1,7 @@
 """Live GCP End-to-End Test against the New Gemini Enterprise Instance & Private Cloud Run MCP/A2A.
 
 When `RUN_LIVE_GCP_E2E=true` is set (via `./scripts/run_live_gcp_e2e_proof.sh`), this test
-queries real GCP APIs in `wortz-project-352116` (project number `679926387543`) to verify:
+queries real GCP APIs in `your-gcp-project-id` (project number `123456789012`) to verify:
 1. The PSC Network Attachment (`ge-agent-psc-attachment`) is provisioned and ACCEPTED (`10.128.20.2`).
 2. The Private Cloud Run service (`internal-data-mcp`) is active with `INGRESS_TRAFFIC_INTERNAL_ONLY`.
 3. The Agent Gateway (`ge-private-egress-gateway`) is ACTIVE with `AGENT_TO_ANYWHERE`, bound to
@@ -25,8 +25,8 @@ import httpx
 import pytest
 
 RUN_LIVE = os.getenv("RUN_LIVE_GCP_E2E", "false").lower() == "true"
-PROJECT_ID = os.getenv("GCP_PROJECT_ID", "wortz-project-352116")
-PROJECT_NUMBER = os.getenv("GCP_PROJECT_NUMBER", "679926387543")
+PROJECT_ID = os.getenv("GCP_PROJECT_ID", "your-gcp-project-id")
+PROJECT_NUMBER = os.getenv("GCP_PROJECT_NUMBER", "123456789012")
 REGION = os.getenv("GCP_REGION", "us-central1")
 GE_LOCATION = os.getenv("GE_APP_LOCATION", "global")
 GE_ENGINE_ID = os.getenv("GE_ENGINE_ID", "ge-mcp-psc-vpcsc-app")
@@ -71,15 +71,16 @@ def test_live_gcp_fresh_gemini_enterprise_app_and_mcp_over_psc() -> None:
             f"Expected ACCEPTED PSC connection endpoint on ge-agent-psc-attachment: {conn_endpoints}"
         )
 
-        # 2. Verify Private Cloud Run MCP & A2A Server is deployed with INGRESS_TRAFFIC_INTERNAL_ONLY
-        run_url = (
-            f"https://run.googleapis.com/v2/"
-            f"projects/{PROJECT_ID}/locations/{REGION}/services/internal-data-mcp"
-        )
-        run_resp = client.get(run_url, headers=headers)
-        assert run_resp.status_code == 200, f"Cloud Run service check failed: {run_resp.text}"
-        run_body = run_resp.json()
-        assert run_body.get("ingress") == "INGRESS_TRAFFIC_INTERNAL_ONLY"
+        # 2. Verify Private Cloud Run MCP & Dedicated A2A Services are deployed with INGRESS_TRAFFIC_INTERNAL_ONLY
+        for svc_id in ("internal-data-mcp", "internal-finance-a2a"):
+            run_url = (
+                f"https://run.googleapis.com/v2/"
+                f"projects/{PROJECT_ID}/locations/{REGION}/services/{svc_id}"
+            )
+            run_resp = client.get(run_url, headers=headers)
+            assert run_resp.status_code == 200, f"Cloud Run service check ({svc_id}) failed: {run_resp.text}"
+            run_body = run_resp.json()
+            assert run_body.get("ingress") == "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
         # 3. Verify Agent Gateway is active in us-central1 with PSC Network Attachment & Registry
         gw_url = (
@@ -140,8 +141,8 @@ def test_live_gcp_fresh_gemini_enterprise_app_and_mcp_over_psc() -> None:
         assert mcp_resp.status_code == 200, f"AgentRegistry mcpServers check failed: {mcp_resp.text}"
         mcp_servers = mcp_resp.json().get("mcpServers", [])
         mcp_names = [s.get("displayName", "") + " " + s.get("name", "") for s in mcp_servers]
-        assert any("Internal Data MCP" in n or "4213-411a00778a8c" in n for n in mcp_names)
-        assert any("On-Prem ERP MCP" in n or "cf69-cfc1c5295c6f" in n for n in mcp_names)
+        assert any("Internal Data MCP" in n or "11111111-1111-1111-1111-111111111111" in n for n in mcp_names)
+        assert any("On-Prem ERP MCP" in n or "22222222-2222-2222-2222-222222222222" in n for n in mcp_names)
 
         agents_url = (
             f"https://agentregistry.googleapis.com/v1alpha/"
@@ -151,6 +152,7 @@ def test_live_gcp_fresh_gemini_enterprise_app_and_mcp_over_psc() -> None:
         assert agents_resp.status_code == 200, f"AgentRegistry agents check failed: {agents_resp.text}"
         agents_list = agents_resp.json().get("agents", [])
         assert any("Internal Finance Analysis A2A Agent" in a.get("displayName", "") for a in agents_list)
+        assert any("internal-finance-a2a" in json.dumps(a) for a in agents_list)
 
         # 6. Verify New Gemini Enterprise Engine is bound to Agent Gateway & Registry
         engine_url = (
@@ -197,12 +199,89 @@ def test_live_gcp_fresh_gemini_enterprise_app_and_mcp_over_psc() -> None:
             },
         )
         assert assist_resp.status_code == 200, f"Gemini Enterprise streamAssist failed: {assist_resp.text}"
-        payload_text = json.dumps(assist_resp.json())
-        assert "GOOG" in payload_text
-        assert "96,450" in payload_text or "96450" in payload_text, (
-            f"Expected live MCP revenue metric (96,450) in streamAssist response: {payload_text}"
+        chunks = assist_resp.json()
+        full_reply_text = "".join(
+            reply.get("groundedContent", {}).get("content", {}).get("text", "")
+            for chunk in chunks
+            for reply in chunk.get("answer", {}).get("replies", [])
         )
-        assert "33.4" in payload_text, (
-            f"Expected live MCP operating margin (33.4%) in streamAssist response: {payload_text}"
+        combined_text = full_reply_text + " " + json.dumps(chunks)
+        assert "GOOG" in combined_text
+        assert "96,450" in combined_text or "96450" in combined_text, (
+            f"Expected live MCP revenue metric (96,450) in streamAssist response: {combined_text}"
         )
+        assert "33.4" in combined_text, (
+            f"Expected live MCP operating margin (33.4%) in streamAssist response: {combined_text}"
+        )
+
+
+@pytest.mark.skipif(
+    not RUN_LIVE,
+    reason="Live GCP test requires unsandboxed gcloud access; run via ./scripts/run_live_gcp_e2e_proof.sh",
+)
+def test_live_gemini_enterprise_a2a_agent_invocation_and_idempotency() -> None:
+    """Verify live Gemini Enterprise A2A Agent invocation over Agent Gateway + PSC to dedicated internal-finance-a2a."""
+    token = _gcloud_access_token()
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Goog-User-Project": PROJECT_ID,
+        "Content-Type": "application/json",
+    }
+
+    with httpx.Client(timeout=60.0) as client:
+        # 1. Discover the registered A2A Agent on the Gemini Enterprise Assistant
+        agents_list_url = (
+            f"https://discoveryengine.googleapis.com/v1alpha/"
+            f"projects/{PROJECT_ID}/locations/{GE_LOCATION}/collections/default_collection/"
+            f"engines/{GE_ENGINE_ID}/assistants/default_assistant/agents"
+        )
+        agents_resp = client.get(agents_list_url, headers=headers)
+        assert agents_resp.status_code == 200, f"Assistant agents list failed: {agents_resp.text}"
+        agents_list = agents_resp.json().get("agents", [])
+        finance_agents = [
+            a for a in agents_list if "Internal Finance" in a.get("displayName", "")
+        ]
+        assert finance_agents, f"Expected 'Internal Finance' A2A Agent on assistant: {agents_list}"
+        a2a_agent_resource = finance_agents[0]["name"]
+        a2a_agent_id = a2a_agent_resource.split("/")[-1]
+        assert finance_agents[0].get("state") == "ENABLED"
+        assert "internal-finance-a2a" in finance_agents[0].get("a2aAgentDefinition", {}).get("jsonAgentCard", "")
+
+        # 2. Invoke the A2A Agent twice consecutively via :streamAssist with agentsSpec.agentSpecs
+        assist_url = (
+            f"https://discoveryengine.googleapis.com/v1alpha/"
+            f"projects/{PROJECT_ID}/locations/{GE_LOCATION}/collections/default_collection/"
+            f"engines/{GE_ENGINE_ID}/assistants/default_assistant:streamAssist"
+        )
+        for attempt in (1, 2):
+            resp = client.post(
+                assist_url,
+                headers=headers,
+                json={
+                    "query": {
+                        "text": "Analyze GOOG Q3-2026 financial variance and executive margin highlights."
+                    },
+                    "agentsSpec": {
+                        "agentSpecs": [
+                            {"agentId": a2a_agent_id}
+                        ]
+                    },
+                },
+            )
+            assert resp.status_code == 200, f"A2A streamAssist attempt #{attempt} failed: {resp.text}"
+            chunks = resp.json()
+            full_reply_text = "".join(
+                reply.get("groundedContent", {}).get("content", {}).get("text", "")
+                for chunk in chunks
+                for reply in chunk.get("answer", {}).get("replies", [])
+            )
+            body_text = full_reply_text + " " + json.dumps(chunks)
+            assert '"state": "SUCCEEDED"' in body_text, (
+                f"Expected SUCCEEDED state on A2A streamAssist attempt #{attempt}: {body_text}"
+            )
+            assert "96,450" in body_text or "Processed private A2A request" in body_text, (
+                f"Expected A2A variance report from internal-finance-a2a on attempt #{attempt}: {body_text}"
+            )
+
+
 

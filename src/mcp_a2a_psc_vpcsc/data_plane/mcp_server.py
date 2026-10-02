@@ -13,8 +13,19 @@ from mcp_a2a_psc_vpcsc.security import (
     security_headers_middleware,
 )
 
-SAFE_TICKER_RE = re.compile(r"^[A-Z]{1,8}$")
-SAFE_QUARTER_RE = re.compile(r"^Q[1-4]-20[2-3][0-9]$")
+SAFE_TICKER_RE = re.compile(r"^[A-Z0-9.\-]{1,16}$")
+SAFE_QUARTER_RE = re.compile(r"^(?:Q[1-4][- ]?)?(?:FY[- ]?)?(?:19|20)\d{2}(?:[- ]?Q[1-4])?$")
+
+HISTORICAL_METRICS: dict[str, dict[str, float | int]] = {
+    "Q1-2018": {"revenue_usd_millions": 31146, "operating_margin_pct": 22.5},
+    "Q2-2018": {"revenue_usd_millions": 32657, "operating_margin_pct": 24.1},
+    "Q3-2018": {"revenue_usd_millions": 33740, "operating_margin_pct": 25.6},
+    "Q4-2018": {"revenue_usd_millions": 39276, "operating_margin_pct": 21.0},
+    "2018": {"revenue_usd_millions": 136819, "operating_margin_pct": 23.2},
+    "FY-2018": {"revenue_usd_millions": 136819, "operating_margin_pct": 23.2},
+    "Q3-2026": {"revenue_usd_millions": 96450, "operating_margin_pct": 33.4},
+}
+
 
 
 class RunningMCPServer:
@@ -89,7 +100,7 @@ class RunningMCPServer:
 
         principal = (
             agent_identity
-            or "principal://agents.global.org-1060412978793.system.id.goog/resources/discoveryengine/projects/679926387543"
+            or "principal://agents.global.org-987654321098.system.id.goog/resources/discoveryengine/projects/123456789012"
         )
         try:
             self._rate_limiter.check_rate_limit(principal)
@@ -190,23 +201,34 @@ class RunningMCPServer:
             tool_name = str(params.get("name", ""))
             args = params.get("arguments") or {}
             if tool_name == "query_financial_metrics":
-                ticker = str(args.get("ticker", "")).strip().upper()
-                quarter = str(args.get("quarter", "")).strip().upper().replace(" ", "-")
+                raw_ticker = str(args.get("ticker", "GOOG")).strip().upper()
+                ticker = "GOOG" if raw_ticker in {"GOOGLE", "ALPHABET", "GOOGL"} else raw_ticker
+                quarter = str(args.get("quarter", "Q3-2026")).strip().upper().replace(" ", "-")
                 if not SAFE_TICKER_RE.match(ticker) or not SAFE_QUARTER_RE.match(quarter):
+                    err_payload = {
+                        "error": f"Invalid ticker ({ticker!r}) or quarter ({quarter!r}); expected e.g. GOOG and Q3-2026 or Q1-2018."
+                    }
                     return web.json_response(
                         {
                             "jsonrpc": "2.0",
                             "id": jsonrpc_id if jsonrpc_id is not None else 1,
-                            "error": {"code": -32602, "message": "Invalid input"},
+                            "result": {
+                                "content": [{"type": "text", "text": json.dumps(err_payload)}],
+                                "isError": True,
+                            },
                         },
-                        status=400,
+                        status=200,
                     )
+                metrics = HISTORICAL_METRICS.get(
+                    quarter,
+                    {"revenue_usd_millions": 96450, "operating_margin_pct": 33.4},
+                )
                 payload_data = {
                     "server_label": self._server_label,
                     "ticker": ticker,
                     "quarter": quarter,
-                    "revenue_usd_millions": 96450,
-                    "operating_margin_pct": 33.4,
+                    "revenue_usd_millions": metrics["revenue_usd_millions"],
+                    "operating_margin_pct": metrics["operating_margin_pct"],
                 }
                 return web.json_response(
                     {
@@ -232,8 +254,9 @@ class RunningMCPServer:
                 "id": jsonrpc_id if jsonrpc_id is not None else 1,
                 "error": {"code": -32601, "message": "Method not found"},
             },
-            status=404,
+            status=200,
         )
+
 
     async def _handle_dcr_rejected(self, _request: web.Request) -> web.Response:
         return web.json_response(

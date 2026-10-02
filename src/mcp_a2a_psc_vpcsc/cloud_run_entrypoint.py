@@ -16,9 +16,10 @@ async def create_cloud_run_app() -> web.Application:
     """Create unified Cloud Run application serving /mcp, /a2a, and /healthz."""
     cfg = ArchitectureConfig()
     token_mgr = TokenManager(secret_key=cfg.jwt_secret)
+    service_name = os.getenv("K_SERVICE", "internal-data-mcp")
     service_url = os.getenv(
         "PUBLIC_SERVICE_URL",
-        f"https://internal-data-mcp-{cfg.project_number}.{cfg.region}.run.app",
+        f"https://{service_name}-{cfg.project_number}.{cfg.region}.run.app",
     )
     mcp = RunningMCPServer(
         token_manager=token_mgr,
@@ -37,6 +38,7 @@ async def create_cloud_run_app() -> web.Application:
     app.router.add_post("/oauth/register", mcp._handle_dcr_rejected)
     app.router.add_get("/.well-known/agent-card.json", a2a._handle_agent_card)
     app.router.add_post("/a2a", a2a._handle_a2a_post)
+    app.router.add_post("/", a2a._handle_a2a_post)
     return app
 
 

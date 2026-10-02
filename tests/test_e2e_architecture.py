@@ -237,7 +237,7 @@ def test_control_plane_agent_registry_views_and_regional_alignment(arch_env) -> 
     assert data_mcp.tools["delete_ledger_record"]["read_only_hint"] is False
 
     # Prove regional mismatch (e.g., global GE App with us-east1 Agent Registry) is rejected
-    bad_registry = AgentRegistryStore(project_id="wortz-project-352116", location="us-east1")
+    bad_registry = AgentRegistryStore(project_id="your-gcp-project-id", location="us-east1")
     with pytest.raises(RegionalAlignmentError):
         bad_registry.validate_regional_alignment(ge_app_location="global")
 

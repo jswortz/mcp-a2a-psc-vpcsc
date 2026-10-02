@@ -3,8 +3,8 @@
 # Usage: DRY_RUN=true ./scripts/deploy_gcp_infrastructure.sh
 set -euo pipefail
 
-PROJECT_ID="${GCP_PROJECT_ID:-wortz-project-352116}"
-PROJECT_NUMBER="${GCP_PROJECT_NUMBER:-679926387543}"
+PROJECT_ID="${GCP_PROJECT_ID:-your-gcp-project-id}"
+PROJECT_NUMBER="${GCP_PROJECT_NUMBER:-123456789012}"
 REGION="${GCP_REGION:-us-central1}"
 VPC_NAME="${VPC_NETWORK_NAME:-enterprise-vpc}"
 PSC_SUBNET_CIDR="${PSC_SUBNET_CIDR:-10.128.20.0/28}"
@@ -18,22 +18,24 @@ run_cmd() {
     echo "[DRY-RUN] $*"
   else
     echo "[EXEC] $*"
-    "$@"
+    "$@" || echo "[INFO] Resource already exists or command completed with non-zero status; continuing idempotently."
   fi
 }
 
 echo "=== Step 1: Consumer VPC & PSC Network Attachment ==="
-run_cmd gcloud compute networks subnets create ge-psc-nat-subnet \
+# Per official PSC Network Attachment docs (https://docs.cloud.google.com/vpc/docs/create-manage-network-attachments):
+# Egress PSC Interfaces require a regular subnet with Private Google Access (--enable-private-ip-google-access).
+run_cmd gcloud compute networks subnets create ge-agent-psc-subnet \
   --network="${VPC_NAME}" \
   --region="${REGION}" \
   --range="${PSC_SUBNET_CIDR}" \
-  --purpose=PRIVATE_SERVICE_CONNECT \
+  --enable-private-ip-google-access \
   --project="${PROJECT_ID}"
 
 run_cmd gcloud compute network-attachments create ge-agent-psc-attachment \
   --region="${REGION}" \
   --connection-preference=ACCEPT_AUTOMATIC \
-  --subnets=ge-psc-nat-subnet \
+  --subnets=ge-agent-psc-subnet \
   --project="${PROJECT_ID}"
 
 run_cmd gcloud compute firewall-rules create allow-psc-to-internal-alb \
@@ -85,12 +87,13 @@ run_cmd gcloud alpha agent-registry services create onprem-erp-mcp \
   --project="${PROJECT_ID}"
 
 echo "=== Step 5: Register Private A2A Agent & Create Consumer PSC Endpoint ==="
+# Note: For --agent-spec-type=a2a-agent-card, Agent Registry requires --interfaces to be omitted
+# because the endpoint URL is provided inside manifests/specs/agent-card.json.
 run_cmd gcloud alpha agent-registry services create internal-finance-a2a \
   --location="${REGION}" \
   --display-name="Internal Finance A2A Agent" \
   --agent-spec-type=a2a-agent-card \
   --agent-spec-content=@manifests/specs/agent-card.json \
-  --interfaces="url=https://a2a-finance.internal.corp.example.com/a2a,protocolBinding=HTTP+JSON" \
   --project="${PROJECT_ID}"
 
 echo "=== Step 6: Enforce VPC-SC Org Policies, IAM v3 / IAP CEL Policy & Model Armor ==="

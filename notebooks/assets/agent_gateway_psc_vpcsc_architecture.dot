@@ -28,7 +28,7 @@ digraph G {
     ];
 
     subgraph cluster_zone1 {
-        label="Zone 1: Google AI Tenant & Control Plane (wortz-project-352116)";
+        label="Zone 1: Google AI Tenant & Control Plane (your-gcp-project-id)";
         style="rounded,filled";
         color="#1A73E8";
         fillcolor="#E8F0FE";
