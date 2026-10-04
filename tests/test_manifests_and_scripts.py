@@ -129,10 +129,10 @@ async def test_tutorial_notebook_executes_cleanly() -> None:
     cells = nb_data.get("cells", [])
     assert len(cells) >= 12
 
-    # Verify high-res PNGs are embedded in cell 1 outputs
+    # Verify all 8 high-res PNGs (6 executive slides + 2 architecture diagrams) are embedded in cell 1 outputs
     cell1_outputs = cells[1].get("outputs", [])
     png_outputs = [o for o in cell1_outputs if "image/png" in o.get("data", {})]
-    assert len(png_outputs) == 2
+    assert len(png_outputs) == 8
 
     code_cells = [c for c in cells if c.get("cell_type") == "code"]
     assert len(code_cells) >= 6

@@ -272,8 +272,87 @@ def test_notebook_structure_and_teaching_links() -> None:
         assert len(c.get("outputs", [])) >= 1, f"Code cell #{idx + 1} is missing executed outputs"
 
 
+KNOWN_404_URL_SUBSTRINGS = (
+    "docs.cloud.google.com/gemini/enterprise/docs/custom-mcp-server",
+    "docs.cloud.google.com/gemini/enterprise/docs/register-and-manage-mcp-servers",
+    "docs.cloud.google.com/gemini/enterprise/docs/agent-gateway",
+    "docs.cloud.google.com/gemini/enterprise/docs/vpc-service-controls",
+    "docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/create-access-policy",
+    "cloud.google.com/vpc/docs/troubleshoot-private-service-connect",
+    "cloud.google.com/vpc/docs/troubleshoot-psc-propagation",
+    "cloud.google.com/vpc-service-controls/docs/troubleshoot-ost",
+    "google.github.io/A2A",
+)
+
+VERIFIED_LIVE_CITATION_URLS = {
+    "https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server",
+    "https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/import-govern-mcp-server-agent-registry",
+    "https://docs.cloud.google.com/gemini/enterprise/docs/import-govern-agent-registry",
+    "https://docs.cloud.google.com/gemini/enterprise/docs/register-and-manage-an-a2a-agent",
+    "https://docs.cloud.google.com/gemini/enterprise/docs/invoke-agent-a2a",
+    "https://docs.cloud.google.com/gemini/enterprise/docs/invoke-agent-streamassist",
+    "https://docs.cloud.google.com/gemini/enterprise/docs/use-vpc-service-controls",
+    "https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/agent-gateway-overview",
+    "https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/set-up-agent-gateway",
+    "https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/agent-gateway-ge-deploy",
+    "https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/set-up-vpc-connectivity",
+    "https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/policies/configure-iam-policies-uap",
+    "https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/policies/iam-overview-uap",
+    "https://docs.cloud.google.com/gemini-enterprise-agent-platform/troubleshooting/troubleshoot-agent-gateway",
+    "https://docs.cloud.google.com/agent-registry/overview",
+    "https://docs.cloud.google.com/agent-registry/register-mcp-servers",
+    "https://docs.cloud.google.com/agent-registry/register-agents",
+    "https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http",
+    "https://modelcontextprotocol.io/specification/2025-03-26/server/tools#tool-annotations",
+    "https://a2a-protocol.org/latest/specification/",
+    "https://a2a-protocol.org/latest/specification/#8-agent-discovery-the-agent-card",
+    "https://a2a-protocol.org/latest/specification/#311-send-message",
+    "https://a2a-protocol.org/latest/topics/agent-discovery/",
+    "https://cloud.google.com/vpc/docs/about-network-attachments",
+    "https://docs.cloud.google.com/vpc/docs/create-manage-network-attachments",
+    "https://cloud.google.com/vpc/docs/configure-private-service-connect-apis",
+    "https://cloud.google.com/vpc/docs/monitor-private-service-connect-connections",
+    "https://cloud.google.com/vpc/docs/troubleshooting-policy-and-access-problems",
+    "https://cloud.google.com/dns/docs/zones/peering-zones",
+    "https://cloud.google.com/dns/docs/zones/peering-zones#permissions",
+    "https://cloud.google.com/load-balancing/docs/l7-internal",
+    "https://cloud.google.com/load-balancing/docs/negs/serverless-neg-concepts",
+    "https://cloud.google.com/load-balancing/docs/negs/hybrid-neg-concepts",
+    "https://cloud.google.com/vpc-service-controls/docs/overview",
+    "https://cloud.google.com/vpc-service-controls/docs/troubleshooting",
+    "https://cloud.google.com/resource-manager/docs/organization-policy/overview",
+    "https://cloud.google.com/iam/docs/conditions-overview",
+    "https://cloud.google.com/iam/docs/conditions-attribute-reference",
+    "https://cloud.google.com/security-command-center/docs/model-armor-overview",
+    "https://cloud.google.com/apis/design/design_patterns#idempotency",
+    "https://cloud.google.com/generative-ai-app-builder/docs/reference/rest/v1alpha/projects.locations.collections.engines.assistants/streamAssist",
+    "https://spiffe.io/docs/latest/spiffe-about/spiffe-concepts/",
+}
+
+
+def test_notebook_external_citations_verified_and_no_404s() -> None:
+    """Verify no known 404 URLs exist and all external citations in the notebook are verified live URLs."""
+    nb_path = REPO_ROOT / "notebooks" / "agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb"
+    nb_data = json.loads(nb_path.read_text(encoding="utf-8"))
+    markdown_cells = [
+        "".join(c.get("source", [])) if isinstance(c.get("source"), list) else str(c.get("source", ""))
+        for c in nb_data.get("cells", [])
+        if c.get("cell_type") == "markdown"
+    ]
+    full_markdown = "\n\n".join(markdown_cells)
+    links = re.findall(r"\[([^\]]*)\]\(([^)]+)\)", full_markdown)
+    external_links = [target for _, target in links if target.startswith("https://")]
+
+    for url in external_links:
+        for bad_sub in KNOWN_404_URL_SUBSTRINGS:
+            assert bad_sub not in url, f"Found broken/404 citation URL in notebook: {url}"
+        assert url in VERIFIED_LIVE_CITATION_URLS, f"Unverified external citation URL in notebook: {url}"
+
+
 def test_executive_slides_and_presentation_links() -> None:
-    """Verify all 6 high-resolution executive slides and Google Slides deck links are present."""
+    """Verify all 6 high-resolution executive slides and 2 architecture diagrams render inline on GitHub via display_data."""
+    import base64
+
     slides_dir = REPO_ROOT / "notebooks" / "assets" / "slides"
     expected_slides = [
         "slide-1-executive-overview.png",
@@ -284,10 +363,35 @@ def test_executive_slides_and_presentation_links() -> None:
         "slide-6-live-e2e-and-idempotency.png",
     ]
     readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    nb_text = (REPO_ROOT / "notebooks" / "agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb").read_text(encoding="utf-8")
+    nb_path = REPO_ROOT / "notebooks" / "agent_gateway_mcp_a2a_psc_vpcsc_tutorial.ipynb"
+    nb_text = nb_path.read_text(encoding="utf-8")
+    nb_data = json.loads(nb_text)
 
     assert "notebooks/assets/slides/slides-patch.md" in readme_text
     assert "assets/slides/slides-patch.md" in nb_text
+
+    # 1. Verify no relative markdown image syntax ![...](assets/...) in markdown cells (breaks in GitHub ipynb viewer)
+    for idx, cell in enumerate(nb_data.get("cells", [])):
+        if cell.get("cell_type") == "markdown":
+            src = "".join(cell.get("source", [])) if isinstance(cell.get("source"), list) else str(cell.get("source", ""))
+            broken_md_imgs = re.findall(r"!\[[^\]]*\]\((?!https?://)[^)]+\)", src)
+            assert not broken_md_imgs, (
+                f"Cell {idx} contains relative markdown image tags that fail in GitHub's .ipynb viewer: {broken_md_imgs}"
+            )
+
+    # 2. Verify all 6 slides and 2 high-res diagrams (8 PNGs total) are embedded as base64 image/png in Cell 1 outputs
+    cell1_outputs = nb_data["cells"][1].get("outputs", [])
+    png_b64_outputs = [
+        o["data"]["image/png"]
+        for o in cell1_outputs
+        if o.get("output_type") == "display_data" and "image/png" in o.get("data", {})
+    ]
+    assert len(png_b64_outputs) == 8, f"Expected 8 inline image/png display_data outputs in Cell 1, got {len(png_b64_outputs)}"
+
+    embedded_bytes = [
+        base64.b64decode("".join(b64) if isinstance(b64, list) else b64)
+        for b64 in png_b64_outputs
+    ]
 
     for slide_name in expected_slides:
         slide_path = slides_dir / slide_name
@@ -297,4 +401,6 @@ def test_executive_slides_and_presentation_links() -> None:
         assert len(raw) > 200_000, f"Expected high-resolution slide (>200KB), got {len(raw)} bytes for {slide_name}"
         assert slide_name in readme_text, f"Missing link to {slide_name} in README.md"
         assert slide_name in nb_text, f"Missing link to {slide_name} in tutorial notebook"
+        assert raw in embedded_bytes, f"Slide {slide_name} is not embedded in Cell 1 inline display_data outputs"
+
 
