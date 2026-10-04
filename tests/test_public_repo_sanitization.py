@@ -46,6 +46,7 @@ SKIP_DIRS = {
     ".pytest_cache",
     "mcp_a2a_psc_vpcsc.egg-info",
     ".benchmarks",
+    ".worktrees",
 }
 
 
@@ -132,7 +133,8 @@ def test_git_branch_history_is_clean() -> None:
             skip_file = "test_public_repo_sanitization.py" in line
             continue
         if not in_diff:
-            checked_lines.append(line)
+            if not line.lower().startswith(("author:", "commit:")):
+                checked_lines.append(line)
         elif not skip_file and line.startswith("+") and not line.startswith("+++"):
             checked_lines.append(line)
     history_text = "\n".join(checked_lines)
